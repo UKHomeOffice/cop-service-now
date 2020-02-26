@@ -6,6 +6,9 @@ echo
 echo -n "Repository build number: "
 read build_number
 
+echo -n "Service Now environment (mock, training, prod): "
+read service_env
+
 echo -n "Deployment stage (open, complete, cancel): "
 read status
 
@@ -43,9 +46,17 @@ elif [[ "$status" != "open" ]]; then
   echo "Ticket id: $ticket_id"
 fi
 
+
+if [[ "$service_env" == "prod" ]]; then
+  deployment_stage=$status
+else
+  deployment_stage="${status}-${service_env}"
+fi
+
 echo "Build number: $build_number"
 echo "Status: $status"
+echo "Stage: $deployment_stage"
 
-drone deploy --param SNOW_TITLE="$title" --param SNOW_COMMENTS="$snow_comments" --param SNOW_START_TIME="$start_datetime" --param SNOW_END_TIME="$end_datetime" --param SNOW_COMMENTS="$comments" "UKHomeOffice/cop-service-now" $build_number $status 
+#drone deploy --param SNOW_TITLE="$title" --param SNOW_COMMENTS="$snow_comments" --param SNOW_START_TIME="$start_datetime" --param SNOW_END_TIME="$end_datetime" --param SNOW_COMMENTS="$comments" "UKHomeOffice/cop-service-now" $build_number $deployment_stage
 
 exit
