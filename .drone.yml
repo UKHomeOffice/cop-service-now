@@ -79,8 +79,11 @@ pipeline:
       - source: DEV_SERVICE_NOW_USERNAME
         target: SNOW_TEST_USER
     environment:
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_DESC=${DRONE_COMMIT_MESSAGE}
       - SNOW_EXTERNAL_ID=COP
+      - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=deployment
+      - SNOW_TITLE=${DRONE_REPO}:${DRONE_COMMIT_SHA}
     when:
       environment: open-training
       event: deployment
@@ -93,7 +96,10 @@ pipeline:
       - source: DEV_SERVICE_NOW_USERNAME
         target: SNOW_TEST_USER
     environment:
+      - SNOW_DESC="Completed successfully"
+      - SNOW_EXTERNAL_ID=COP
       - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=update
     deployment_outcome: success
     when:
       environment: complete-training
@@ -107,7 +113,10 @@ pipeline:
       - source: DEV_SERVICE_NOW_USERNAME
         target: SNOW_TEST_USER
     environment:
+      - SNOW_DESC="Deployment failed"
+      - SNOW_EXTERNAL_ID=COP
       - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=update
     deployment_outcome: fail
     when:
       environment: cancel-training
@@ -121,8 +130,11 @@ pipeline:
       - source: PRODUCTION_SERVICE_NOW_USERNAME
         target: SNOW_PROD_USER
     environment:
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_DESC=${DRONE_COMMIT_MESSAGE}
       - SNOW_EXTERNAL_ID=COP
+      - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=deployment
+      - SNOW_TITLE=${DRONE_REPO}:${DRONE_COMMIT_SHA}
     when:
       environment: open
       event: deployment
@@ -135,7 +147,10 @@ pipeline:
       - source: PRODUCTION_SERVICE_NOW_USERNAME
         target: SNOW_PROD_USER
     environment:
+      - SNOW_DESC="Completed successfully"
+      - SNOW_EXTERNAL_ID=COP
       - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=update
     deployment_outcome: success
     when:
       environment: complete
@@ -149,7 +164,10 @@ pipeline:
       - source: PRODUCTION_SERVICE_NOW_USERNAME
         target: SNOW_PROD_USER
     environment:
+      - SNOW_DESC="Deployment failed"
+      - SNOW_EXTERNAL_ID=COP
       - SNOW_INT_ID_FILE=/drone/src/internal-id
+      - SNOW_NOTIFICATION_TYPE=update
     deployment_outcome: fail
     when:
       environment: cancel
