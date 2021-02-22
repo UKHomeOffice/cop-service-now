@@ -1,190 +1,234 @@
-pipeline:
+---
+kind: pipeline
+type: kubernetes
+name: default
 
-  synch_notprod_secrets:
-    image: quay.io/ukhomeofficedigital/cop-secrets
-    environment:
-      - DRONE_SERVER=https://drone.acp.homeoffice.gov.uk
-      - DEPLOY_ENV=production
-    secrets:
-      - source: DEV_DRONE_AWS_ACCESS_KEY_ID
-        target: AWS_ACCESS_KEY_ID
-      - source: DEV_DRONE_AWS_SECRET_ACCESS_KEY
-        target: AWS_SECRET_ACCESS_KEY
-      - source: DRONE_PUBLIC_TOKEN
-        target: DRONE_TOKEN
-    when:
-      environment: secrets
-      event: deployment
+platform:
+  os: linux
+  arch: amd64
 
-  synch_prod_secrets:
-    image: quay.io/ukhomeofficedigital/cop-secrets
-    environment:
-      - DRONE_SERVER=https://drone.acp.homeoffice.gov.uk
-      - DEPLOY_ENV=production
-    secrets:
-      - source: PRODUCTION_DRONE_AWS_ACCESS_KEY_ID
-        target: AWS_ACCESS_KEY_ID
-      - source: PRODUCTION_DRONE_AWS_SECRET_ACCESS_KEY
-        target: AWS_SECRET_ACCESS_KEY
-      - source: DRONE_PUBLIC_TOKEN
-        target: DRONE_TOKEN
-    when:
-      environment: secrets
-      event: deployment
+steps:
+- name: synch_notprod_secrets
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/cop-secrets
+  environment:
+    AWS_ACCESS_KEY_ID:
+      from_secret: DEV_DRONE_AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY:
+      from_secret: DEV_DRONE_AWS_SECRET_ACCESS_KEY
+    DEPLOY_ENV: production
+    DRONE_SERVER: https://drone-gh.acp.homeoffice.gov.uk
+    DRONE_TOKEN:
+      from_secret: DRONE_V1_PUBLIC_TOKEN
+    DRONE_VERSION: ${DRONE_SYSTEM_VERSION}
+  when:
+    event:
+    - promote
+    target:
+    - secrets
 
-  open-snow-change-mock:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - SNOW_TEST_PASS
-    environment:
-      - SNOW_TEST_USER=ctodashboard-ci
-      - SNOW_ENDPOINT=https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/create
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_EXTERNAL_ID=COP
-    when:
-      environment: open-mock
-      event: deployment
+- name: synch_prod_secrets
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/cop-secrets
+  environment:
+    AWS_ACCESS_KEY_ID:
+      from_secret: PRODUCTION_DRONE_AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY:
+      from_secret: PRODUCTION_DRONE_AWS_SECRET_ACCESS_KEY
+    DEPLOY_ENV: production
+    DRONE_SERVER: https://drone-gh.acp.homeoffice.gov.uk
+    DRONE_TOKEN:
+      from_secret: DRONE_V1_PUBLIC_TOKEN
+    DRONE_VERSION: ${DRONE_SYSTEM_VERSION}
+  when:
+    event:
+    - promote
+    target:
+    - secrets
 
-  complete-snow-change-mock:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - SNOW_TEST_PASS
-    environment:
-      - SNOW_TEST_USER=ctodashboard-ci
-      - SNOW_ENDPOINT=https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/update
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
+- name: open-snow-change-mock
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  environment:
+    SNOW_ENDPOINT: https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/create
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_TEST_PASS:
+      from_secret: SNOW_TEST_PASS
+    SNOW_TEST_USER: ctodashboard-ci
+  when:
+    event:
+    - promote
+    target:
+    - open-mock
+
+- name: complete-snow-change-mock
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: success
-    when:
-      environment: complete-mock
-      event: deployment
+  environment:
+    SNOW_ENDPOINT: https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/update
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_TEST_PASS:
+      from_secret: SNOW_TEST_PASS
+    SNOW_TEST_USER: ctodashboard-ci
+  when:
+    event:
+    - promote
+    target:
+    - complete-mock
 
-  cancel-snow-change-mock:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - SNOW_TEST_PASS
-    environment:
-      - SNOW_TEST_USER=ctodashboard-ci
-      - SNOW_ENDPOINT=https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/update
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
+- name: cancel-snow-change-mock
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: fail
-    when:
-      environment: cancel-mock
-      event: deployment
+  environment:
+    SNOW_ENDPOINT: https://cto-change-dev.internal.cto-notprod.homeoffice.gov.uk/update
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_TEST_PASS:
+      from_secret: SNOW_TEST_PASS
+    SNOW_TEST_USER: ctodashboard-ci
+  when:
+    event:
+    - promote
+    target:
+    - cancel-mock
 
-  open-snow-change-training:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: DEV_SERVICE_NOW_PASSWORD
-        target: SNOW_TEST_PASS
-      - source: DEV_SERVICE_NOW_USERNAME
-        target: SNOW_TEST_USER
-    environment:
-      - SNOW_DESC=${DRONE_COMMIT_MESSAGE}
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=deployment
-      - SNOW_TITLE=${DRONE_REPO}:${DRONE_COMMIT_SHA}
-    when:
-      environment: open-training
-      event: deployment
+- name: open-snow-change-training
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  environment:
+    SNOW_DESC: ${DRONE_COMMIT_MESSAGE}
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: deployment
+    SNOW_TEST_PASS:
+      from_secret: DEV_SERVICE_NOW_PASSWORD
+    SNOW_TEST_USER:
+      from_secret: DEV_SERVICE_NOW_USERNAME
+    SNOW_TITLE: ${DRONE_REPO}:${DRONE_COMMIT_SHA}
+  when:
+    event:
+    - promote
+    target:
+    - open-training
 
-  complete-snow-change-notprod:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: DEV_SERVICE_NOW_PASSWORD
-        target: SNOW_TEST_PASS
-      - source: DEV_SERVICE_NOW_USERNAME
-        target: SNOW_TEST_USER
-    environment:
-      - SNOW_DESC="Completed successfully"
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=update
+- name: complete-snow-change-notprod
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: success
-    when:
-      environment: complete-training
-      event: deployment
+  environment:
+    SNOW_DESC: "\"Completed successfully\""
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: update
+    SNOW_TEST_PASS:
+      from_secret: DEV_SERVICE_NOW_PASSWORD
+    SNOW_TEST_USER:
+      from_secret: DEV_SERVICE_NOW_USERNAME
+  when:
+    event:
+    - promote
+    target:
+    - complete-training
 
-  cancel-snow-change-notprod:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: DEV_SERVICE_NOW_PASSWORD
-        target: SNOW_TEST_PASS
-      - source: DEV_SERVICE_NOW_USERNAME
-        target: SNOW_TEST_USER
-    environment:
-      - SNOW_DESC="Deployment failed"
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=update
+- name: cancel-snow-change-notprod
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: fail
-    when:
-      environment: cancel-training
-      event: deployment
+  environment:
+    SNOW_DESC: "\"Deployment failed\""
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: update
+    SNOW_TEST_PASS:
+      from_secret: DEV_SERVICE_NOW_PASSWORD
+    SNOW_TEST_USER:
+      from_secret: DEV_SERVICE_NOW_USERNAME
+  when:
+    event:
+    - promote
+    target:
+    - cancel-training
 
-  open-snow-change-prod:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: PRODUCTION_SERVICE_NOW_PASSWORD
-        target: SNOW_PROD_PASS
-      - source: PRODUCTION_SERVICE_NOW_USERNAME
-        target: SNOW_PROD_USER
-    environment:
-      - SNOW_DESC=${DRONE_COMMIT_MESSAGE}
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=deployment
-      - SNOW_TITLE=${DRONE_REPO}:${DRONE_COMMIT_SHA}
-    when:
-      environment: open
-      event: deployment
+- name: open-snow-change-prod
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  environment:
+    SNOW_DESC: ${DRONE_COMMIT_MESSAGE}
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: deployment
+    SNOW_PROD_PASS:
+      from_secret: PRODUCTION_SERVICE_NOW_PASSWORD
+    SNOW_PROD_USER:
+      from_secret: PRODUCTION_SERVICE_NOW_USERNAME
+    SNOW_TITLE: ${DRONE_REPO}:${DRONE_COMMIT_SHA}
+  when:
+    event:
+    - promote
+    target:
+    - open
 
-  complete-snow-change-prod:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: PRODUCTION_SERVICE_NOW_PASSWORD
-        target: SNOW_PROD_PASS
-      - source: PRODUCTION_SERVICE_NOW_USERNAME
-        target: SNOW_PROD_USER
-    environment:
-      - SNOW_DESC="Completed successfully"
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=update
+- name: complete-snow-change-prod
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: success
-    when:
-      environment: complete
-      event: deployment
+  environment:
+    SNOW_DESC: "\"Completed successfully\""
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: update
+    SNOW_PROD_PASS:
+      from_secret: PRODUCTION_SERVICE_NOW_PASSWORD
+    SNOW_PROD_USER:
+      from_secret: PRODUCTION_SERVICE_NOW_USERNAME
+  when:
+    event:
+    - promote
+    target:
+    - complete
 
-  cancel-snow-change-prod:
-    image: quay.io/ukhomeofficedigital/snowtify:latest
-    secrets:
-      - source: PRODUCTION_SERVICE_NOW_PASSWORD
-        target: SNOW_PROD_PASS
-      - source: PRODUCTION_SERVICE_NOW_USERNAME
-        target: SNOW_PROD_USER
-    environment:
-      - SNOW_DESC="Deployment failed"
-      - SNOW_EXTERNAL_ID=COP
-      - SNOW_INT_ID_FILE=/drone/src/internal-id
-      - SNOW_NOTIFICATION_TYPE=update
+- name: cancel-snow-change-prod
+  pull: if-not-exists
+  image: quay.io/ukhomeofficedigital/snowtify:latest
+  settings:
     deployment_outcome: fail
-    when:
-      environment: cancel
-      event: deployment
+  environment:
+    SNOW_DESC: "\"Deployment failed\""
+    SNOW_EXTERNAL_ID: COP
+    SNOW_INT_ID_FILE: /drone/src/internal-id
+    SNOW_NOTIFICATION_TYPE: update
+    SNOW_PROD_PASS:
+      from_secret: PRODUCTION_SERVICE_NOW_PASSWORD
+    SNOW_PROD_USER:
+      from_secret: PRODUCTION_SERVICE_NOW_USERNAME
+  when:
+    event:
+    - promote
+    target:
+    - cancel
 
-  notify:
-    image: plugins/slack
-    secrets: [ SLACK_WEBHOOK ]
+- name: notify
+  pull: if-not-exists
+  image: plugins/slack
+  settings:
     channel: cop-deployments
+    template: "{{#build.deployTo}}\n  *{{repo.name}} - Build {{build.number}} - {{uppercasefirst build.deployTo}} - {{uppercase build.status}}*\n{{else}}\n  *{{repo.name}} - Build {{build.number}} - Development - {{uppercase build.status}}*\n{{/build.deployTo}} {{build.link}}\n"
     username: Drone Build Watcher
-    template: >
-      {{#build.deployTo}}
-        *{{repo.name}} - Build {{build.number}} - {{uppercasefirst build.deployTo}} - {{uppercase build.status}}*
-      {{else}}
-        *{{repo.name}} - Build {{build.number}} - Development - {{uppercase build.status}}*
-      {{/build.deployTo}}
-      {{build.link}}
-    when:
-      event: deployment
-      status: [ success, failure ]
+  environment:
+    SLACK_WEBHOOK:
+      from_secret: SLACK_WEBHOOK
+  when:
+    event:
+    - promote
+    status:
+    - success
+    - failure
+
+...
